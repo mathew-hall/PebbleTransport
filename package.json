@@ -1,0 +1,35 @@
+{
+    "author": "mathew.james.hall@gmail.com",
+    "dependencies": {},
+    "keywords": [],
+    "name": "transporter",
+    "pebble": {
+        "displayName": "Transporter",
+        "enableMultiJS": true,
+        "messageKeys": [
+            "service",
+            "destination",
+            "time",
+            "isLiveFeed",
+            "CLEAR",
+            "NEXT"
+        ],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "emery"
+        ],
+        "uuid": "4245ea1b-5213-4a2b-a78f-685c20d58878",
+        "watchapp": {
+            "watchface": false
+        }
+    },
+    "version": "1.0.0"
+}
