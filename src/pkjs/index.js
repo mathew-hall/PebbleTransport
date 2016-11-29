@@ -1,71 +1,21 @@
-
-
 var NAPTAN = "37020361";
-var STOP_NAME = "";
+var STOP_NAME = "West Street";
+
+var Clay = require('pebble-clay');
+var clayConfig = require('./config');
+var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 
 
-var NUM_SERVICES = 5;
+var getTimes=require('./timetable.js');
 
-var xhrRequest = function (url, type, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
-    callback(this.responseText);
-  };
-  xhr.open(type, url);
-  xhr.send();
-};
-
-function get_next_departures(response){
-	
-	var extract_row = function(line){
-		var chunks = line.replace(/<td [^>]+>/g,'').replace(/&nbsp;/g,'').split("</td>");
-		var ret = {};
-		ret.service = chunks[0];
-		ret.destination = chunks[1];
-		ret.time = chunks[2];
-		ret.isLiveFeed = chunks[3] == 'LF';
-		return ret;
-	};
-	
-	var flat = response.replace(/[\r\n]/g,'');
-	var body = flat.match(/<table[^>]+>(.+)<\/table>/)[1];
-	var lines = body.split("</tr>");
-	var services =  lines.map(extract_row);
-  services.length = NUM_SERVICES;
-  return services;
-}
-
-function getTimes() {
-  var url = 'http://tsy.acislive.com/pip/stop_simulator_table.asp?NaPTAN='+ NAPTAN + '&bMap=0&offset=0&refresh=30&pscode=51&dest=&duegate=90&PAC=37020361';
-  xhrRequest(url,'get',onTimesAvailable);
-}
-
-function logCallback(m){
-  console.log("Result:",m);
-}
-
-function onTimesAvailable(res){
-  var times = get_next_departures(res);
-  console.log(times);
-  
-  Pebble.sendAppMessage({CLEAR:0});
-  var i = 0;
-  times.forEach(function(time){
-    console.log("Sending",JSON.stringify(time));
-    time.NEXT = i;
-    Pebble.sendAppMessage(time,logCallback,function(er){console.log("error",er);});
-    i++;
-  });
-  
-  
-}
-           
 // Listen for when the watchface is opened
 Pebble.addEventListener('ready', 
   function(e) {
+    NAPTAN = localStorage.getItem('NAPTAN') || NAPTAN;
+    STOP_NAME = localStorage.getItem('STOP_NAME') || STOP_NAME;
     console.log('PebbleKit JS ready!');
     Pebble.sendAppMessage({STOPNAME:STOP_NAME});
-    getTimes();
+    getTimes(NAPTAN);
   }
 );
 
@@ -75,3 +25,28 @@ Pebble.addEventListener('appmessage',
     console.log('AppMessage received!');
   }                     
 );
+
+Pebble.addEventListener('showConfiguration', function(e) {
+  clay.setSettings('NAPTAN',NAPTAN);
+  clay.setSettings('STOPNAME',STOP_NAME);
+  Pebble.openURL(clay.generateUrl());
+});
+
+
+Pebble.addEventListener('webviewclosed', function(e) {
+  console.log("Web view closed", JSON.stringify(e));
+  
+  console.log(JSON.stringify(e));
+  if (e && !e.response) {
+    return;
+  }
+
+  var settings = JSON.parse(decodeURIComponent(e.response));
+  NAPTAN=settings.NAPTAN.value;
+  STOP_NAME = settings.STOPNAME.value;
+  getTimes(NAPTAN);
+  localStorage.setItem('NAPTAN', NAPTAN);
+  localStorage.setItem('STOP_NAME', STOP_NAME);
+  console.log("Settings are ", JSON.stringify(settings));
+
+});

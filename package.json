@@ -1,9 +1,14 @@
 {
     "author": "mathew.james.hall@gmail.com",
-    "dependencies": {},
+    "dependencies": {
+        "pebble-clay": "^1.0.3"
+    },
     "keywords": [],
     "name": "transporter",
     "pebble": {
+        "capabilities": [
+            "configurable"
+        ],
         "displayName": "Transporter",
         "enableMultiJS": true,
         "messageKeys": [
@@ -12,7 +17,9 @@
             "time",
             "isLiveFeed",
             "CLEAR",
-            "NEXT"
+            "NEXT",
+            "STOPNAME",
+            "NAPTAN"
         ],
         "projectType": "native",
         "resources": {

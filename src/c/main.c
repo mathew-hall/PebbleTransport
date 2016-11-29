@@ -1,29 +1,39 @@
 #include <pebble.h>
 #include "main.h"
 
+#define NUM_TIMETABLE_ENTRIES  5
+
+
 static Window*  s_main_window;
 static TextLayer* s_time_layer;
-static TextLayer* s_timetable_layer;
+static TextLayer* s_timetable_layer[NUM_TIMETABLE_ENTRIES];
 
 struct TimetableEntry {
   char service[10];
   char destination[10];
   char time[8];
+  char linebuf[16];
   int liveFeed;
 };
 
-#define NUM_TIMETABLE_ENTRIES  5
 
 struct TimetableEntry entries[NUM_TIMETABLE_ENTRIES];
 int next_timetable = 0;
 static void update_time();
 static void update_timetable();
 
+static int min(int a, int b){
+  return a < b? a: b;
+}
+
 static void handle_timetable_entry(DictionaryIterator *iterator){
   Tuple *CLEAR = dict_find(iterator, MESSAGE_KEY_CLEAR);
   if(CLEAR){
     APP_LOG(APP_LOG_LEVEL_INFO,"Clearing timetable");
     next_timetable = 0;
+    for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
+      entries[next_timetable].linebuf[0] = '\0';
+    }
     return;
   }
   
@@ -44,6 +54,9 @@ static void handle_timetable_entry(DictionaryIterator *iterator){
     snprintf(entry->time,sizeof entry->time,"%s",timeval->value->cstring);
     snprintf(entry->service,sizeof entry->service,"%s",service->value->cstring);
     snprintf(entry->destination,sizeof entry->destination,"%s",destination->value->cstring);
+    
+    snprintf(entry->linebuf, sizeof entry->linebuf, "%s %s %s", entry->time,entry->service,entry->destination);
+    
     APP_LOG(APP_LOG_LEVEL_INFO,"Have got %s for service %s to %s", entry->time,entry->service,entry->destination);
     update_timetable();
     return;
@@ -77,11 +90,16 @@ static void main_window_load(Window* window){
   Layer* window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   s_time_layer = text_layer_create(
-    GRect(0,PBL_IF_ROUND_ELSE(58,52),bounds.size.w, 50)
+    GRect(0,PBL_IF_ROUND_ELSE(70,64),bounds.size.w, 50)
   );
-  s_timetable_layer = text_layer_create(
-    GRect(0,PBL_IF_ROUND_ELSE(25,19),bounds.size.w,50)
-  );
+  
+  
+  for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
+    int place = 10 + i * 12;
+    s_timetable_layer[i] = text_layer_create(
+      GRect(0,PBL_IF_ROUND_ELSE(place,place-5),bounds.size.w,50)
+    );
+  }
   
   text_layer_set_background_color(s_time_layer,GColorClear);
   text_layer_set_text_color(s_time_layer,GColorBlack);
@@ -91,18 +109,28 @@ static void main_window_load(Window* window){
   
   layer_add_child(window_layer,text_layer_get_layer(s_time_layer));
   
-  text_layer_set_background_color(s_timetable_layer,GColorClear);
-  text_layer_set_text_color(s_timetable_layer,GColorBlack);
-  text_layer_set_text(s_timetable_layer,"No data");
-  text_layer_set_font(s_timetable_layer,fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_timetable_layer,GTextAlignmentCenter);
   
-  layer_add_child(window_layer,text_layer_get_layer(s_timetable_layer));
-  
+  for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
+    TextLayer *text_layer = s_timetable_layer[i];
+    
+    text_layer_set_background_color(text_layer,GColorClear);
+    text_layer_set_text_color(text_layer,GColorBlack);
+    text_layer_set_text(text_layer,"No data");
+    text_layer_set_font(text_layer,fonts_get_system_font(FONT_KEY_GOTHIC_14));
+    text_layer_set_text_alignment(text_layer,GTextAlignmentCenter);
+
+    layer_add_child(window_layer,text_layer_get_layer(text_layer));
+    
+    struct TimetableEntry *entry = &entries[i];
+    text_layer_set_text(text_layer, entry->linebuf);
+  }
 }
 
 static void main_window_unload(Window* window){
   text_layer_destroy(s_time_layer); 
+  for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
+    text_layer_destroy(s_timetable_layer[i]); 
+  }
 }
 
 static void update_time() {
@@ -120,18 +148,15 @@ static void update_time() {
 }
 
 static void update_timetable(){
-  //TODO: multiple rows
-  for(int n = 0; n < 1;n++){
-      struct TimetableEntry *entry = &entries[n];
-      static char s_linebuf[16];
-      snprintf(s_linebuf, sizeof s_linebuf, "%s %s %s", entry->time,entry->service,entry->destination);
-    
-      text_layer_set_text(s_timetable_layer, s_linebuf);
+  for(int n = 0; n < min(NUM_TIMETABLE_ENTRIES,next_timetable+1);n++){    
+    struct TimetableEntry *entry = &entries[n];
+    text_layer_set_text(s_timetable_layer[n], entry->linebuf);
   }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
+  update_timetable();
 }
 
 static void init(){
