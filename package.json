@@ -19,7 +19,8 @@
             "CLEAR",
             "NEXT",
             "STOPNAME",
-            "NAPTAN"
+            "NAPTAN",
+            "POLL"
         ],
         "projectType": "native",
         "resources": {

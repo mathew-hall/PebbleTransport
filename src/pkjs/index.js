@@ -22,6 +22,12 @@ Pebble.addEventListener('ready',
 // Listen for when an AppMessage is received
 Pebble.addEventListener('appmessage',
   function(e) {
+    
+    var result = e.payload;
+    if(result['POLL']){
+      getTimes(NAPTAN);
+    }
+    
     console.log('AppMessage received!');
   }                     
 );
@@ -45,6 +51,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
   NAPTAN=settings.NAPTAN.value;
   STOP_NAME = settings.STOPNAME.value;
   getTimes(NAPTAN);
+  Pebble.sendAppMessage({STOPNAME:STOP_NAME});
   localStorage.setItem('NAPTAN', NAPTAN);
   localStorage.setItem('STOP_NAME', STOP_NAME);
   console.log("Settings are ", JSON.stringify(settings));

@@ -7,6 +7,7 @@
 static Window*  s_main_window;
 static TextLayer* s_time_layer;
 static TextLayer* s_timetable_layer[NUM_TIMETABLE_ENTRIES];
+static TextLayer* s_stop_name_layer;
 
 struct TimetableEntry {
   char service[10];
@@ -19,6 +20,8 @@ struct TimetableEntry {
 
 struct TimetableEntry entries[NUM_TIMETABLE_ENTRIES];
 int next_timetable = 0;
+char stop_name[16];
+
 static void update_time();
 static void update_timetable();
 
@@ -37,11 +40,21 @@ static void handle_timetable_entry(DictionaryIterator *iterator){
     return;
   }
   
+  Tuple *STOPNAME = dict_find(iterator,MESSAGE_KEY_STOPNAME);
+  if(STOPNAME){
+    snprintf(stop_name, sizeof stop_name, "%s", STOPNAME->value->cstring);
+    APP_LOG(APP_LOG_LEVEL_INFO, "Got stop name %s", stop_name);
+    return;
+  }
+
+  
   Tuple *NEXT = dict_find(iterator, MESSAGE_KEY_NEXT);
   if(NEXT){
     next_timetable = NEXT->value->int32;
     APP_LOG(APP_LOG_LEVEL_INFO, "Next timetable slot is now %d",next_timetable);
   }
+  
+
 
   Tuple *timeval = dict_find(iterator, MESSAGE_KEY_time);
   Tuple *service = dict_find(iterator,MESSAGE_KEY_service);
@@ -84,6 +97,13 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 }
 
 
+static void init_text_layer(TextLayer* layer,char* text,GFont font){
+  text_layer_set_background_color(layer,GColorClear);
+  text_layer_set_text_color(layer,GColorBlack);
+  text_layer_set_text(layer,text);
+  text_layer_set_font(layer,font);
+  text_layer_set_text_alignment(layer,GTextAlignmentCenter);
+}
 
 
 static void main_window_load(Window* window){
@@ -101,29 +121,26 @@ static void main_window_load(Window* window){
     );
   }
   
-  text_layer_set_background_color(s_time_layer,GColorClear);
-  text_layer_set_text_color(s_time_layer,GColorBlack);
-  text_layer_set_text(s_time_layer,"00:00");
-  text_layer_set_font(s_time_layer,fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
-  text_layer_set_text_alignment(s_time_layer,GTextAlignmentCenter);
+  s_stop_name_layer = text_layer_create(
+    GRect(0,PBL_IF_ROUND_ELSE(120,116),bounds.size.w,50)
+  );
+  
+  init_text_layer(s_time_layer,"00:00",fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
   
   layer_add_child(window_layer,text_layer_get_layer(s_time_layer));
   
   
   for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
     TextLayer *text_layer = s_timetable_layer[i];
-    
-    text_layer_set_background_color(text_layer,GColorClear);
-    text_layer_set_text_color(text_layer,GColorBlack);
-    text_layer_set_text(text_layer,"No data");
-    text_layer_set_font(text_layer,fonts_get_system_font(FONT_KEY_GOTHIC_14));
-    text_layer_set_text_alignment(text_layer,GTextAlignmentCenter);
-
+    init_text_layer(text_layer,"No data",fonts_get_system_font(FONT_KEY_GOTHIC_14));
     layer_add_child(window_layer,text_layer_get_layer(text_layer));
     
     struct TimetableEntry *entry = &entries[i];
     text_layer_set_text(text_layer, entry->linebuf);
   }
+  
+  init_text_layer(s_stop_name_layer,"stop name",fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  layer_add_child(window_layer,text_layer_get_layer(s_stop_name_layer));
 }
 
 static void main_window_unload(Window* window){
@@ -131,6 +148,7 @@ static void main_window_unload(Window* window){
   for(int i = 0; i < NUM_TIMETABLE_ENTRIES; i++){
     text_layer_destroy(s_timetable_layer[i]); 
   }
+  text_layer_destroy(s_stop_name_layer);
 }
 
 static void update_time() {
@@ -152,11 +170,20 @@ static void update_timetable(){
     struct TimetableEntry *entry = &entries[n];
     text_layer_set_text(s_timetable_layer[n], entry->linebuf);
   }
+  text_layer_set_text(s_stop_name_layer, stop_name);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
-  update_timetable();
+  DictionaryIterator* iterator;
+  if(app_message_outbox_begin(&iterator) == APP_MSG_OK){
+    APP_LOG(APP_LOG_LEVEL_INFO, "Asking for more recent times");
+    dict_write_int8(iterator, MESSAGE_KEY_POLL, 1);
+    app_message_outbox_send();
+  }else{
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Couldn't open output dictionary");
+  }
+  
 }
 
 static void init(){
